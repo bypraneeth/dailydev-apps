@@ -1,3 +1,5 @@
+import type { Browser } from 'webextension-polyfill';
+
 export const extensionSiteEmbedTargetQueryParam = 'target';
 export const extensionSiteEmbedParentOriginQueryParam = 'parentOrigin';
 export const extensionSiteEmbedReloadNonceQueryParam = 'reloadNonce';
@@ -19,6 +21,7 @@ export const extensionSiteEmbedFrameEvent = {
 
 export const extensionSiteEmbedParentEvent = {
   Disable: 'daily-extension-site-embed-disable',
+  RequestDomReady: 'daily-extension-site-embed-request-dom-ready',
 } as const;
 
 export const extensionSiteEmbedTargetEvent = {
@@ -62,6 +65,7 @@ export type ExtensionSiteEmbedTargetMessage = {
   source: typeof extensionSiteEmbedTargetMessageSource;
   type: ExtensionSiteEmbedTargetEventType;
   target?: string;
+  nonce?: string;
 };
 
 const isExactOrSubdomainOf = (hostname: string, domain: string): boolean =>
@@ -110,7 +114,13 @@ export const isEmbeddableSiteTarget = (value: string): boolean => {
   }
 };
 
+export const getFirefoxExtensionApi = (): Browser | undefined =>
+  process.env.TARGET_BROWSER === 'firefox'
+    ? (globalThis as typeof globalThis & { browser?: Browser }).browser
+    : undefined;
+
 export const getExtensionOrigin = (extensionId: string): string =>
+  getFirefoxExtensionApi()?.runtime.getURL('').replace(/\/$/, '') ??
   `chrome-extension://${extensionId.trim()}`;
 
 export const buildExtensionSiteEmbedFrameSrc = ({

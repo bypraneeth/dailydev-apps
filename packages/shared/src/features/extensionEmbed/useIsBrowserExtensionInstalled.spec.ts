@@ -1,10 +1,41 @@
-import { detectBrowserExtensionInstalled } from './useIsBrowserExtensionInstalled';
+import {
+  detectBrowserExtensionInstalled,
+  isBrowserExtensionInstalled,
+  useIsBrowserExtensionInstalled,
+} from './useIsBrowserExtensionInstalled';
 
 describe('detectBrowserExtensionInstalled', () => {
   beforeEach(() => {
     document.documentElement.removeAttribute('data-daily-extension-installed');
     document.head.innerHTML = '';
     jest.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    Reflect.deleteProperty(globalThis, 'browser');
+  });
+
+  it('recognizes the local Firefox extension without a content-script marker or probe', async () => {
+    jest.replaceProperty(process, 'env', {
+      ...process.env,
+      TARGET_BROWSER: 'firefox',
+    });
+    Object.defineProperty(globalThis, 'browser', {
+      configurable: true,
+      value: { runtime: { id: 'daily-local@example.test' } },
+    });
+    const append = jest.spyOn(document.head, 'appendChild');
+
+    expect(isBrowserExtensionInstalled()).toBe(true);
+    expect(useIsBrowserExtensionInstalled()).toEqual({
+      isInstalled: true,
+      isChecking: false,
+    });
+    await expect(
+      detectBrowserExtensionInstalled('firefox-resource-uuid'),
+    ).resolves.toBe(true);
+    expect(append).not.toHaveBeenCalled();
   });
 
   it('returns true immediately when the ping marker is present', async () => {

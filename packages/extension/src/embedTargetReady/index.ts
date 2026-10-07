@@ -1,8 +1,11 @@
 import {
+  extensionSiteEmbedParentEvent,
+  extensionSiteEmbedParentMessageSource,
   extensionSiteEmbedTargetEvent,
   extensionSiteEmbedTargetMessageSource,
   isDailyDevEmbedAncestor,
 } from '@dailydotdev/shared/src/features/extensionEmbed/common';
+import browser from 'webextension-polyfill';
 
 const hasDailyDevEmbedAncestor = (): boolean => {
   const ancestors = window.location.ancestorOrigins;
@@ -27,7 +30,45 @@ const hasDailyDevEmbedAncestor = (): boolean => {
 // signal for cross-origin iframes — the iframe element's `load` event fires
 // even for XFO-blocked navigations, so it can't be trusted on its own.
 if (window.top !== window.self) {
-  if (hasDailyDevEmbedAncestor()) {
+  if (process.env.TARGET_BROWSER === 'firefox') {
+    const extensionOrigin = browser.runtime.getURL('').replace(/\/$/, '');
+    const post = (nonce?: string) => {
+      const send = () =>
+        window.parent.postMessage(
+          {
+            source: extensionSiteEmbedTargetMessageSource,
+            type: extensionSiteEmbedTargetEvent.DomReady,
+            target: window.location.href,
+            nonce,
+          },
+          extensionOrigin,
+        );
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', send, { once: true });
+      } else {
+        send();
+      }
+    };
+    window.addEventListener('message', (event: MessageEvent) => {
+      if (
+        event.origin !== extensionOrigin ||
+        (event.source !== window.parent && event.source !== null) ||
+        event.data?.source !== extensionSiteEmbedParentMessageSource ||
+        event.data?.type !== extensionSiteEmbedParentEvent.RequestDomReady ||
+        typeof event.data?.nonce !== 'string' ||
+        !event.data.nonce ||
+        event.data.nonce.length > 128
+      ) {
+        return;
+      }
+
+      post(event.data.nonce);
+    });
+
+    // An announcement only prompts a challenge to the parent's own iframe.
+    // It cannot mark the reader ready without the nonce reply.
+    post();
+  } else if (hasDailyDevEmbedAncestor()) {
     const post = () => {
       try {
         window.parent.postMessage(

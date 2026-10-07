@@ -194,7 +194,7 @@ const baseConfig = {
 
 const backgroundConfig = {
   ...baseConfig,
-  target: 'webworker',
+  target: targetBrowser === 'firefox' ? 'web' : 'webworker',
   output: {
     ...baseConfig.output,
     clean: true,

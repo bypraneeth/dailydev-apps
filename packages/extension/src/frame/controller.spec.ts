@@ -30,14 +30,21 @@ describe('initializeFrame', () => {
   const target = new URL('https://example.com/article');
   const sendParentMessage = jest.fn();
   const onEmbeddingEnabled = jest.fn();
+  const originalBrowser = process.env.TARGET_BROWSER;
 
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
+    process.env.TARGET_BROWSER = 'chrome';
   });
 
   afterEach(() => {
     jest.useRealTimers();
+    if (originalBrowser === undefined) {
+      delete process.env.TARGET_BROWSER;
+    } else {
+      process.env.TARGET_BROWSER = originalBrowser;
+    }
   });
 
   it('requests an extension reload after permission is granted', async () => {
@@ -86,5 +93,58 @@ describe('initializeFrame', () => {
     expect(browser.runtime.reload).toHaveBeenCalledTimes(0);
     jest.runOnlyPendingTimers();
     expect(browser.runtime.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('enables Firefox embedding after granting permission without reloading', async () => {
+    process.env.TARGET_BROWSER = 'firefox';
+    (hasFrameEmbeddingPermissions as jest.Mock).mockResolvedValue(false);
+    (requestFrameEmbeddingPermissions as jest.Mock).mockResolvedValue(true);
+    (enableFrameEmbeddingViaBackground as jest.Mock).mockResolvedValue({
+      enabled: true,
+      tabId: 17,
+    });
+
+    await initializeFrame({
+      root,
+      target,
+      sendParentMessage,
+      onEmbeddingEnabled,
+    });
+
+    const { onRequestPermission } = (renderPermissionPrompt as jest.Mock).mock
+      .calls[0][0];
+    await expect(onRequestPermission()).resolves.toBe('granted');
+
+    expect(enableFrameEmbeddingViaBackground).toHaveBeenCalledWith();
+    expect(onEmbeddingEnabled).toHaveBeenCalled();
+    expect(sendParentMessage).toHaveBeenCalledWith(
+      extensionSiteEmbedFrameEvent.EmbeddingReady,
+      { target: target.href },
+    );
+    expect(sendParentMessage).not.toHaveBeenCalledWith(
+      extensionSiteEmbedFrameEvent.ReloadRequested,
+      expect.anything(),
+    );
+    jest.runOnlyPendingTimers();
+    expect(browser.runtime.reload).not.toHaveBeenCalled();
+  });
+
+  it('does not enable embedding when Firefox permission is denied', async () => {
+    process.env.TARGET_BROWSER = 'firefox';
+    (hasFrameEmbeddingPermissions as jest.Mock).mockResolvedValue(false);
+    (requestFrameEmbeddingPermissions as jest.Mock).mockResolvedValue(false);
+
+    await initializeFrame({
+      root,
+      target,
+      sendParentMessage,
+      onEmbeddingEnabled,
+    });
+
+    const { onRequestPermission } = (renderPermissionPrompt as jest.Mock).mock
+      .calls[0][0];
+    await expect(onRequestPermission()).resolves.toBe('dismissed');
+    expect(enableFrameEmbeddingViaBackground).not.toHaveBeenCalled();
+    expect(browser.runtime.reload).not.toHaveBeenCalled();
   });
 });

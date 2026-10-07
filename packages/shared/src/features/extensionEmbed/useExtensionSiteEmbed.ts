@@ -2,6 +2,8 @@ import type { MutableRefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildExtensionSiteEmbedFrameSrc,
+  extensionSiteEmbedParentEvent,
+  extensionSiteEmbedParentMessageSource,
   extensionSiteEmbedReconnectAttempts,
   extensionSiteEmbedReconnectDelayMs,
   getExtensionOrigin,
@@ -61,6 +63,7 @@ export const useExtensionSiteEmbed = ({
   const [isTargetDomReady, setIsTargetDomReady] = useState(false);
   const permissionFrameRef = useRef<HTMLIFrameElement | null>(null);
   const targetFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const targetReadyNonceRef = useRef<string | null>(null);
   const trimmedExtensionId = extensionId?.trim() ?? '';
   const trimmedTargetUrl = targetUrl.trim();
   const isTargetValid = isEmbeddableSiteTarget(trimmedTargetUrl);
@@ -99,6 +102,7 @@ export const useExtensionSiteEmbed = ({
       setError(nextError);
       setErrorReason(null);
       setIsTargetDomReady(false);
+      targetReadyNonceRef.current = null;
     },
     [postDisableMessage, stopReconnectLoop],
   );
@@ -195,7 +199,34 @@ export const useExtensionSiteEmbed = ({
         event,
         expectedTargetOrigin,
         expectedTargetSource: targetFrameRef.current?.contentWindow ?? null,
-        onTargetDomReady: () => setIsTargetDomReady(true),
+        expectedExtensionOrigin,
+        expectedTargetNonce:
+          process.env.TARGET_BROWSER === 'firefox'
+            ? targetReadyNonceRef.current
+            : undefined,
+        onTargetDomReadyAnnounced: () => {
+          const targetWindow = targetFrameRef.current?.contentWindow;
+          if (!targetWindow) {
+            return;
+          }
+
+          const nonce = crypto.randomUUID();
+          targetReadyNonceRef.current = nonce;
+          setIsTargetDomReady(false);
+          targetWindow.postMessage(
+            {
+              source: extensionSiteEmbedParentMessageSource,
+              type: extensionSiteEmbedParentEvent.RequestDomReady,
+              nonce,
+            },
+            // Redirects are allowed; only this iframe's nonce can mark it ready.
+            '*',
+          );
+        },
+        onTargetDomReady: () => {
+          targetReadyNonceRef.current = null;
+          setIsTargetDomReady(true);
+        },
       });
     };
 
