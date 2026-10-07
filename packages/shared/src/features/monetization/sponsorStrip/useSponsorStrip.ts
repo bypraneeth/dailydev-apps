@@ -3,6 +3,7 @@ import { useConditionalFeature } from '../../../hooks/useConditionalFeature';
 import { HERO_ELIGIBLE_FEEDS } from '../../../hooks/useFeed';
 import { ViewSize, useViewSizeClient } from '../../../hooks/useViewSize';
 import { featureSponsorStrip } from '../../../lib/featureManagement';
+import { isFirefoxExtension } from '../../../lib/func';
 import type { AllFeedPages } from '../../../lib/query';
 
 interface UseSponsorStripProps {
@@ -38,6 +39,7 @@ export const useSponsorStrip = ({
   const isTablet = useViewSizeClient(ViewSize.Tablet);
   // A logo wall on a phone costs more feed than it can hold logos.
   const isEligible =
+    !isFirefoxExtension &&
     !isPlus &&
     !disableAds &&
     !suppressed &&
