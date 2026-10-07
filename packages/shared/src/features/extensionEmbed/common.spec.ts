@@ -1,11 +1,50 @@
 import {
   buildExtensionSiteEmbedFrameSrc,
+  getExtensionOrigin,
   getExtensionSiteEmbedErrorMessage,
   isDailyDevEmbedAncestor,
   isEmbeddableSiteTarget,
 } from './common';
+import { getBrowserExtensionInstallId } from './getBrowserExtensionInstallId';
 
 describe('extension embed helpers', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    Reflect.deleteProperty(globalThis, 'browser');
+    delete document.documentElement.dataset.dailyExtensionId;
+  });
+
+  it('uses the Firefox resource UUID instead of the add-on ID or page marker', () => {
+    jest.replaceProperty(process, 'env', {
+      ...process.env,
+      TARGET_BROWSER: 'firefox',
+    });
+    Object.defineProperty(globalThis, 'browser', {
+      configurable: true,
+      value: {
+        runtime: {
+          id: 'daily-local@example.test',
+          getURL: () => 'moz-extension://firefox-resource-uuid/',
+        },
+      },
+    });
+    document.documentElement.dataset.dailyExtensionId = 'stale-chrome-id';
+
+    expect(getBrowserExtensionInstallId()).toBe('firefox-resource-uuid');
+    expect(getExtensionOrigin('daily-local@example.test')).toBe(
+      'moz-extension://firefox-resource-uuid',
+    );
+    expect(
+      buildExtensionSiteEmbedFrameSrc({
+        extensionId: 'daily-local@example.test',
+        targetUrl: 'https://example.com/article',
+        parentOrigin: 'moz-extension://firefox-resource-uuid',
+      }),
+    ).toBe(
+      'moz-extension://firefox-resource-uuid/frame.html?target=https%3A%2F%2Fexample.com%2Farticle&parentOrigin=moz-extension%3A%2F%2Ffirefox-resource-uuid',
+    );
+  });
+
   it('builds the extension frame URL with the parent origin', () => {
     expect(
       buildExtensionSiteEmbedFrameSrc({

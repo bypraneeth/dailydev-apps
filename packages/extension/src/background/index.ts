@@ -212,7 +212,13 @@ async function handleMessages(
     // user straight into onboarding a single time.
     try {
       activateOnboardingPending = true;
-      await browser.tabs.create({ url: 'chrome://newtab', active: true });
+      await browser.tabs.create({
+        url:
+          process.env.TARGET_BROWSER === 'firefox'
+            ? undefined
+            : 'chrome://newtab',
+        active: true,
+      });
       return { triggered: true };
     } catch (error) {
       activateOnboardingPending = false;
@@ -241,7 +247,8 @@ async function handleMessages(
     // Runtime.MessageSender.userGesture flag.
     try {
       const granted = await requestFrameEmbeddingPermissions();
-      if (granted) {
+      const willReload = granted && process.env.TARGET_BROWSER !== 'firefox';
+      if (willReload) {
         // Chromium needs a fresh extension context to pick up the just-granted
         // optional host permission for declarativeNetRequest — without it the
         // DNR session-rule call from frame.html hangs. Schedule the reload
@@ -254,7 +261,7 @@ async function handleMessages(
       }
       const response: PermissionGrantResponse = {
         granted,
-        willReload: granted,
+        willReload,
       };
       return response;
     } catch (error) {
@@ -359,8 +366,6 @@ chromeRuntime.onMessage.addListener(
   },
 );
 
-// since we are using V2 on FF / V3 on Chrome,
-// we need to support both action (V3) & browserAction (V2) APIs
 (browser.action || browser.browserAction).onClicked.addListener(() => {
   const url = browser.runtime.getURL('index.html?source=button');
   browser.tabs.create({ url, active: true });

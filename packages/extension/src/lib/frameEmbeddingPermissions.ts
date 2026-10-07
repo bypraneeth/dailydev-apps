@@ -12,6 +12,8 @@ export const hasFrameEmbeddingPermissions = async (): Promise<boolean> =>
 
 export const requestFrameEmbeddingPermissions = async (): Promise<boolean> =>
   getPermissionsApi()?.request({
-    permissions: [FRAME_EMBED_PERMISSION],
+    ...(process.env.TARGET_BROWSER === 'firefox'
+      ? {}
+      : { permissions: [FRAME_EMBED_PERMISSION] }),
     origins: [FRAME_EMBED_ORIGIN],
   }) ?? false;

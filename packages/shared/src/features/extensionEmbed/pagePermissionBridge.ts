@@ -1,3 +1,5 @@
+import { getFirefoxExtensionApi } from './common';
+
 // Page <-> content-script bridge for driving chrome.permissions.request from
 // the webapp while preserving the user gesture.
 //
@@ -57,7 +59,7 @@ const PAGE_HELPER_TIMEOUT_MS = 20_000;
 // content script. Must be invoked synchronously from a user-input handler
 // (e.g. an onClick) so the click's transient activation is still alive when
 // the content script forwards the request to the background.
-export const requestFrameEmbeddingPermissionFromPage = (
+export const requestFrameEmbeddingPermissionFromPage = async (
   timeoutMs: number = PAGE_HELPER_TIMEOUT_MS,
 ): Promise<PagePermissionBridgeResult> => {
   if (typeof window === 'undefined') {
@@ -65,6 +67,22 @@ export const requestFrameEmbeddingPermissionFromPage = (
       granted: false,
       error: 'window-unavailable',
     });
+  }
+
+  const firefox = getFirefoxExtensionApi();
+  if (firefox?.permissions) {
+    try {
+      const granted = await firefox.permissions.request({
+        origins: ['*://*/*'],
+      });
+      return { granted };
+    } catch (error) {
+      return {
+        granted: false,
+        error:
+          error instanceof Error ? error.message : 'Permission request failed',
+      };
+    }
   }
 
   return new Promise<PagePermissionBridgeResult>((resolve) => {

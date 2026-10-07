@@ -15,6 +15,7 @@ import AuthContext from '@dailydotdev/shared/src/contexts/AuthContext';
 import { useSettingsContext } from '@dailydotdev/shared/src/contexts/SettingsContext';
 import { SearchProviderEnum } from '@dailydotdev/shared/src/graphql/search';
 import { LogEvent } from '@dailydotdev/shared/src/lib/log';
+import { isFirefoxExtension } from '@dailydotdev/shared/src/lib/func';
 import { useLogContext } from '@dailydotdev/shared/src/contexts/LogContext';
 import { useFeaturesReadyContext } from '@dailydotdev/shared/src/components/GrowthBookProvider';
 import { feature } from '@dailydotdev/shared/src/lib/featureManagement';
@@ -157,6 +158,7 @@ const MainFeedPageInner = ({
         <MainLayout
           mainPage
           isNavItemsButton
+          hideFeedbackWidget={isFirefoxExtension}
           activePage={activePage}
           onLogoClick={onLogoClick}
           onNavTabClick={onNavTabClick}

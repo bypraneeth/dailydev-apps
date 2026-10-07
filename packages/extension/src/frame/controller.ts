@@ -109,6 +109,16 @@ export const initializeFrame = async ({
           return 'dismissed';
         }
 
+        if (process.env.TARGET_BROWSER === 'firefox') {
+          const enabled = await prepareEmbedding({
+            root,
+            target,
+            sendParentMessage,
+            onEmbeddingEnabled,
+          });
+          return enabled ? 'granted' : 'failed';
+        }
+
         sendParentMessage(extensionSiteEmbedFrameEvent.ReloadRequested, {
           target: target.href,
         });

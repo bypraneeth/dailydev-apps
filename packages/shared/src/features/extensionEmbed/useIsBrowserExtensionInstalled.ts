@@ -1,3 +1,5 @@
+import { getFirefoxExtensionApi } from './common';
+
 // The extension ships a tiny content script (`ping`) that runs at
 // document_start on daily.dev origins and stamps
 // `<html data-daily-extension-installed>`. Reading the attribute is the
@@ -10,6 +12,10 @@
 const MARKER_DATASET_KEY = 'dailyExtensionInstalled';
 
 const readMarker = (): boolean => {
+  if (getFirefoxExtensionApi()?.runtime.id) {
+    return true;
+  }
+
   if (typeof document === 'undefined') {
     return false;
   }

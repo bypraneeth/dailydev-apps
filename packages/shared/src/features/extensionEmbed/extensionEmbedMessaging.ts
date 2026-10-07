@@ -6,6 +6,7 @@ import {
   extensionSiteEmbedTargetEvent,
   extensionSiteEmbedTargetMessageSource,
   getExtensionSiteEmbedErrorMessage,
+  isEmbeddableSiteTarget,
 } from './common';
 import type {
   ExtensionSiteEmbedFrameMessage,
@@ -18,7 +19,10 @@ const getFrameOrigin = (frame: HTMLIFrameElement | null): string | null => {
   }
 
   try {
-    return new URL(frame.src).origin;
+    const url = new URL(frame.src);
+    return ['chrome-extension:', 'moz-extension:'].includes(url.protocol)
+      ? `${url.protocol}//${url.host}`
+      : url.origin;
   } catch {
     return null;
   }
@@ -142,6 +146,9 @@ type HandleExtensionSiteEmbedTargetMessageOptions = {
   event: MessageEvent;
   expectedTargetOrigin: string | null;
   expectedTargetSource?: MessageEventSource | null;
+  expectedExtensionOrigin?: string | null;
+  expectedTargetNonce?: string | null;
+  onTargetDomReadyAnnounced?: () => void;
   onTargetDomReady: (payload: { target: string }) => void;
 };
 
@@ -149,22 +156,54 @@ export const handleExtensionSiteEmbedTargetMessage = ({
   event,
   expectedTargetOrigin,
   expectedTargetSource,
+  expectedExtensionOrigin,
+  expectedTargetNonce,
+  onTargetDomReadyAnnounced,
   onTargetDomReady,
 }: HandleExtensionSiteEmbedTargetMessageOptions): void => {
-  const isExpectedTarget = expectedTargetSource
-    ? event.source === expectedTargetSource
-    : !!expectedTargetOrigin && event.origin === expectedTargetOrigin;
-
-  if (
-    !isExpectedTarget ||
-    event.data?.source !== extensionSiteEmbedTargetMessageSource
-  ) {
+  if (event.data?.source !== extensionSiteEmbedTargetMessageSource) {
     return;
   }
 
   const message = event.data as ExtensionSiteEmbedTargetMessage;
-
-  if (message.type === extensionSiteEmbedTargetEvent.DomReady) {
-    onTargetDomReady({ target: message.target ?? '' });
+  if (message.type !== extensionSiteEmbedTargetEvent.DomReady) {
+    return;
   }
+
+  if (expectedTargetNonce !== undefined) {
+    if (
+      !expectedTargetSource ||
+      (event.source !== null && event.source !== expectedTargetSource) ||
+      !message.target ||
+      !isEmbeddableSiteTarget(message.target)
+    ) {
+      return;
+    }
+
+    // Firefox can hide the source of extension messages. The nonce was sent
+    // only to this iframe; still require its article or extension origin.
+    if (
+      event.origin !== new URL(message.target).origin &&
+      event.origin !== expectedExtensionOrigin
+    ) {
+      return;
+    }
+
+    if (message.nonce === undefined) {
+      onTargetDomReadyAnnounced?.();
+      return;
+    }
+    if (!expectedTargetNonce || message.nonce !== expectedTargetNonce) {
+      return;
+    }
+  } else {
+    const isExpectedTarget = expectedTargetSource
+      ? event.source === expectedTargetSource
+      : !!expectedTargetOrigin && event.origin === expectedTargetOrigin;
+    if (!isExpectedTarget) {
+      return;
+    }
+  }
+
+  onTargetDomReady({ target: message.target ?? '' });
 };
