@@ -1,3 +1,5 @@
+import { getFirefoxExtensionApi } from './common';
+
 /**
  * Resolves the installed browser extension id for embedded article previews.
  *
@@ -12,6 +14,11 @@
  *    extension versions and for SSR.
  */
 export const getBrowserExtensionInstallId = (): string | null => {
+  const firefox = getFirefoxExtensionApi();
+  if (firefox) {
+    return new URL(firefox.runtime.getURL('')).hostname;
+  }
+
   if (typeof window !== 'undefined') {
     const match = /^chrome-extension:\/\/([^/]+)/.exec(window.location.origin);
     if (match?.[1]) {

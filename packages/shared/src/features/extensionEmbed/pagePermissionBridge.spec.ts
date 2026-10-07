@@ -21,6 +21,54 @@ describe('requestFrameEmbeddingPermissionFromPage', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+    jest.restoreAllMocks();
+    Reflect.deleteProperty(globalThis, 'browser');
+  });
+
+  it.each([true, false])(
+    'requests optional Firefox origins synchronously and returns grant %s without the page bridge',
+    async (granted) => {
+      jest.replaceProperty(process, 'env', {
+        ...process.env,
+        TARGET_BROWSER: 'firefox',
+      });
+      const request = jest.fn().mockResolvedValue(granted);
+      Object.defineProperty(globalThis, 'browser', {
+        configurable: true,
+        value: { permissions: { request } },
+      });
+      const dispatch = jest.spyOn(window, 'dispatchEvent');
+
+      const result = requestFrameEmbeddingPermissionFromPage();
+
+      expect(request).toHaveBeenCalledWith({
+        origins: ['*://*/*'],
+      });
+      expect(dispatch).not.toHaveBeenCalled();
+      await expect(result).resolves.toEqual({ granted });
+    },
+  );
+
+  it('reports a failed Firefox permission request without enabling the reader', async () => {
+    jest.replaceProperty(process, 'env', {
+      ...process.env,
+      TARGET_BROWSER: 'firefox',
+    });
+    Object.defineProperty(globalThis, 'browser', {
+      configurable: true,
+      value: {
+        permissions: {
+          request: jest
+            .fn()
+            .mockRejectedValue(new Error('Missing user gesture')),
+        },
+      },
+    });
+
+    await expect(requestFrameEmbeddingPermissionFromPage()).resolves.toEqual({
+      granted: false,
+      error: 'Missing user gesture',
+    });
   });
 
   it('dispatches the request event synchronously to preserve user activation', () => {

@@ -1,3 +1,4 @@
+import browser from 'webextension-polyfill';
 import {
   extensionSiteEmbedFrameMessageSource,
   extensionSiteEmbedParentEvent,
@@ -9,27 +10,18 @@ const isAllowedParentHost = (hostname: string): boolean =>
   hostname.endsWith('.daily.dev') ||
   hostname.endsWith('.local.fylla.dev');
 
-const isSelfExtensionOrigin = (origin: URL): boolean => {
-  if (
-    origin.protocol !== 'chrome-extension:' &&
-    origin.protocol !== 'moz-extension:'
-  ) {
-    return false;
-  }
-  // Only accept the frame's own extension origin — this allows the new tab
-  // page (same extension) to embed frame.html, but rejects other extensions.
-  return (
-    typeof window !== 'undefined' && origin.origin === window.location.origin
-  );
-};
+const extensionOrigin = browser.runtime.getURL('').replace(/\/$/, '');
 
 const getAllowedOrigin = (value: string): string | null => {
   try {
     const origin = new URL(value);
-    if (isSelfExtensionOrigin(origin)) {
-      return origin.origin;
+    if (`${origin.protocol}//${origin.host}` === extensionOrigin) {
+      return extensionOrigin;
     }
-    return isAllowedParentHost(origin.hostname) ? origin.origin : null;
+    return ['http:', 'https:'].includes(origin.protocol) &&
+      isAllowedParentHost(origin.hostname)
+      ? origin.origin
+      : null;
   } catch {
     return null;
   }
@@ -78,6 +70,13 @@ export const isDisableFrameMessage = (
   parentOrigin: string | null,
 ): boolean => {
   if (!parentOrigin || event.origin !== parentOrigin) {
+    return false;
+  }
+
+  if (
+    event.source !== window.parent &&
+    !(event.source === null && parentOrigin === extensionOrigin)
+  ) {
     return false;
   }
 

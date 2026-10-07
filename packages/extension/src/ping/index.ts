@@ -32,6 +32,13 @@ const INSTALL_MARKER = 'dailyExtensionInstalled';
 const ID_MARKER = 'dailyExtensionId';
 const MESSAGE_SOURCE = 'daily-extension-ping';
 
+const pageDetail = <T>(detail: T): T => {
+  const { cloneInto } = globalThis as typeof globalThis & {
+    cloneInto?: (value: T, target: Window) => T;
+  };
+  return cloneInto ? cloneInto(detail, window) : detail;
+};
+
 // chrome.permissions.request is only callable from extension pages. We relay
 // the page's click — while the user gesture is still active in the same task
 // — to the background service worker, which calls request() on the page's
@@ -75,7 +82,7 @@ window.addEventListener(newTabActivationBridgeRequestEvent, () => {
     window.dispatchEvent(
       new CustomEvent<NewTabActivationBridgeResult>(
         newTabActivationBridgeResultEvent,
-        { detail: result },
+        { detail: pageDetail(result) },
       ),
     );
   };
@@ -107,7 +114,7 @@ window.addEventListener(pagePermissionBridgeRequestEvent, () => {
     window.dispatchEvent(
       new CustomEvent<PagePermissionBridgeResult>(
         pagePermissionBridgeResultEvent,
-        { detail: result },
+        { detail: pageDetail(result) },
       ),
     );
   };

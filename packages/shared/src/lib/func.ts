@@ -198,13 +198,15 @@ export const getCurrentBrowserName = (): BrowserName => {
   return BrowserName.Other;
 };
 
-// Browsers we ship the daily.dev extension for — anything embed-extension
-// related (including GrowthBook enrollment for the reader experiment) should
-// gate on this so users on browsers we don't ship for never get dragged into
-// a flow that can never complete for them. Only Chrome and Edge ship today.
+// The local Firefox build supports the reader; hosted pages still require
+// one of the browsers supported by the published extension.
 export const isExtensionCapableBrowser = (): boolean => {
   const name = getCurrentBrowserName();
-  return name === BrowserName.Chrome || name === BrowserName.Edge;
+  return (
+    isFirefoxExtension ||
+    name === BrowserName.Chrome ||
+    name === BrowserName.Edge
+  );
 };
 
 export const shuffleArray = <T>(array: T[]): T[] => {
