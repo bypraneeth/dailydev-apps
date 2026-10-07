@@ -7,6 +7,7 @@ import type { LogContextData } from '../../../hooks/log/useLogContextData';
 import { SharedFeedPage } from '../../../components/utilities/common';
 import { useConditionalFeature } from '../../../hooks/useConditionalFeature';
 import { useViewSizeClient } from '../../../hooks/useViewSize';
+import * as func from '../../../lib/func';
 import { useSponsorStrip } from './useSponsorStrip';
 
 jest.mock('../../../hooks/useConditionalFeature', () => ({
@@ -60,6 +61,19 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockFeature.mockReturnValue({ value: true, isLoading: false });
   mockViewSize.mockReturnValue(true);
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+it('should disable the entire dock without evaluating the flag in Firefox', () => {
+  jest.replaceProperty(func, 'isFirefoxExtension', true);
+
+  expect(render().result.current).toBe(false);
+  expect(mockFeature).toHaveBeenCalledWith(
+    expect.objectContaining({ shouldEvaluate: false }),
+  );
 });
 
 it('should not evaluate the flag while another surface may take the bottom edge', () => {
